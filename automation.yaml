@@ -1,0 +1,193 @@
+alias: PV Reduced Feed-in Control
+description: Automation for controlling PV/battery feed-in to reduce grid feed-in
+trigger:
+  - platform: time_pattern
+    seconds: /16
+  - platform: state
+    entity_id: sensor.solarflow_pack_state
+  - platform: numeric_state
+    entity_id: sensor.solarflow_solar_input_power
+    above: 500
+    enabled: false
+  - platform: numeric_state
+    entity_id: sensor.*from grid*
+    above: 1
+    enabled: false
+  - platform: numeric_state
+    entity_id: sensor.*to grid*
+    above: 1
+    enabled: false
+condition: []
+action:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: sensor.solarflow_pack_state
+            state: "0"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 30
+          - condition: and
+            conditions: []
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id: number.*your inverter*limit_nonpersistent_absolute
+            data:
+              value: >-
+                {{ [0, states('sensor.solarflow_solar_input_power') - 30] | max
+                }}
+      - conditions:
+          - condition: state
+            entity_id: sensor.solarflow_pack_state
+            state: "1"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 30
+          - condition: numeric_state
+            entity_id: sensor.solarflow_solar_input_power
+            above: 500
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
+            data_template:
+              value: >
+                {% set solar_input =
+                states('sensor.solarflow_solar_input_power') | int %} {% set
+                base_value = 100 + max(solar_input - 500, 0) %} {% set *from grid* =
+                states('sensor.*from grid*') | int %} {% set *to grid*
+                = states('sensor.*to grid*') | int %} {% set
+                dynamic_value =
+                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+
+                {% if *from grid* > 0 %}
+                  {% set dynamic_value = dynamic_value + *from grid* %}
+                {% elif *to grid* > 0 %}
+                  {% set dynamic_value = dynamic_value - *to grid* %}
+                {% endif %}
+
+                {% set values = [0, base_value, dynamic_value] | sort %} {{
+                values[1] }}
+      - conditions:
+          - condition: state
+            entity_id: sensor.solarflow_pack_state
+            state: "1"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 30
+          - condition: numeric_state
+            entity_id: sensor.solarflow_solar_input_power
+            below: 500
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id: >-
+                number.*your inverter*limit_persistent_absolute,
+                number.*your inverter*limit_nonpersistent_absolute
+            data_template:
+              value: >
+                {% set base_value =
+                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set *from grid* = states('sensor.*from grid*') | int %} {%
+                set *to grid* = states('sensor.*to grid*')
+                | int %} {% if *from grid* > 0 %}
+                  {% set dynamic_value = base_value + *from grid* %}
+                {% elif *to grid* > 0 %}
+                  {% set dynamic_value = base_value - *to grid* %}
+                {% else %}
+                  {% set dynamic_value = base_value %}
+                {% endif %} {% set values = [0, 70, dynamic_value] | sort %} {{
+                values[1] }}
+      - conditions:
+          - condition: state
+            entity_id: sensor.solarflow_pack_state
+            state: "1"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 30
+          - condition: numeric_state
+            entity_id: sensor.solarflow_electric_level
+            above: 96
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
+            data_template:
+              value: >
+                {% set base_value =
+                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set *from grid* = states('sensor.*from grid*') | int %} {%
+                set *to grid* = states('sensor.*to grid*')
+                | int %} {% set pv_production =
+                states('sensor.solarflow_solar_input_power') | int %} {% if
+                pv_production <= 200 %}
+                  {% if *from grid* > 0 %}
+                    {% set dynamic_value = base_value + *from grid* %}
+                  {% elif *to grid* > 0 %}
+                    {% set dynamic_value = base_value - *to grid* %}
+                  {% else %}
+                    {% set dynamic_value = base_value %}
+                  {% endif %}
+                  {% set values = [0, 70, dynamic_value] | sort %}
+                  {% set dynamic_value = values[1] %}
+                {% else %}
+                  {% set dynamic_value = pv_production - *to grid* - 150 %}
+                {% endif %} {{ dynamic_value }}
+      - conditions:
+          - condition: state
+            entity_id: sensor.solarflow_pack_state
+            state: "2"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 30
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id: >-
+                number.*your inverter*limit_persistent_absolute,
+                number.*your inverter*limit_nonpersistent_absolute
+            data_template:
+              value: >
+                {% set base_value =
+                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set *from grid* = states('sensor.*from grid*') | int %} {%
+                set *to grid* = states('sensor.*to grid*')
+                | int %} {% if *from grid* > 0 %}
+                  {% set dynamic_value = base_value + *from grid* %}
+                {% elif *to grid* > 0 %}
+                  {% set dynamic_value = base_value - *to grid* %}
+                {% else %}
+                  {% set dynamic_value = base_value %}
+                {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
+                {{ values[1] }}
+    default:
+      - service: number.set_value
+        target:
+          entity_id:
+            - number.*your inverter*limit_persistent_absolute
+            - number.*your inverter*limit_nonpersistent_absolute
+        data_template:
+          value: >
+            {% set base_value =
+            states('number.*your inverter*limit_nonpersistent_absolute') | int %} {%
+            set *from grid* = states('sensor.*from grid*') | int %} {% set
+            *to grid* = states('sensor.*to grid*') | int %}
+            {% if *from grid* > 0 %}
+              {% set dynamic_value = base_value + *from grid* %}
+            {% elif *to grid* > 0 %}
+              {% set dynamic_value = base_value - *to grid* %}
+            {% else %}
+              {% set dynamic_value = base_value %}
+            {% endif %} {% set values = [0, 80, dynamic_value] | sort %} {{
+            values[1] }}
+mode: restart

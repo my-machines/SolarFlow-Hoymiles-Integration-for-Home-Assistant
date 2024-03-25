@@ -1,4 +1,6 @@
 # at least the parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user
+# in the zendure app the discharge limit has to be set on a high value of your choosing (the configuration in the zendure app
+# I use: discharge limit: 800, bypass: auto, minimum reserved battery: 20%, charging limit: 100%, everything else: default)
 
 alias: PV Reduced Feed-in Control
 description: Automation for controlling PV/battery feed-in to reduce grid feed-in

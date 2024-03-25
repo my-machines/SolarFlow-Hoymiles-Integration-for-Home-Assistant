@@ -1,3 +1,5 @@
+# at least the parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user
+
 alias: PV Reduced Feed-in Control
 description: Automation for controlling PV/battery feed-in to reduce grid feed-in
 trigger:

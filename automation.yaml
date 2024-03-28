@@ -1,5 +1,5 @@
 # the parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user
-# sensor.solarflow_pack_state = Battery pack status: 0 = full, 1 = charging, 2 = discharging
+# sensor.solarflow_pack_state = Battery pack status: 0 = standby, 1 = charging, 2 = discharging
 # in the zendure app the discharge limit has to be set on a high value of your choosing (the configuration in the zendure app
 # I use: discharge limit: 800, bypass: auto, minimum reserved battery: 20%, charging limit: 100%, everything else: default)
 
@@ -41,8 +41,7 @@ action:
               entity_id: number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
-                {{ [0, states('sensor.solarflow_solar_input_power') - 30] | max
-                }}
+                {{ [0, (states('sensor.solarflow_solar_input_power') | int + 10) - (states('sensor.*to grid*') | int)] | max }}
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state
@@ -62,8 +61,7 @@ action:
                 - number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
-                {% set solar_input =
-                states('sensor.solarflow_solar_input_power') | int %} 
+                {% set solar_input = states('sensor.solarflow_solar_input_power') | int %} 
                 {% set base_value = 100 + max(solar_input - 500, 0) %} 
                 {% set *from grid* = states('sensor.*from grid*') | int %} 
                 {% set *to grid* = states('sensor.*to grid*') | int %} 
@@ -96,8 +94,7 @@ action:
                 number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
-                {% set base_value =
-                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
                 {% set *from grid* = states('sensor.*from grid*') | int %} 
                 {% set *to grid* = states('sensor.*to grid*') | int %} 
                 {% if *from grid* > 0 %}
@@ -106,7 +103,7 @@ action:
                   {% set dynamic_value = base_value - *to grid* %}
                 {% else %}
                   {% set dynamic_value = base_value %}
-                {% endif %} {% set values = [0, 70, dynamic_value] | sort %} 
+                {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
                 {{ values[1] }}
       - conditions:
           - condition: state
@@ -127,8 +124,7 @@ action:
                 - number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
-                {% set base_value =
-                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
                 {% set *from grid* = states('sensor.*from grid*') | int %} 
                 {% set *to grid* = states('sensor.*to grid*') | int %} 
                 {% set pv_production = states('sensor.solarflow_solar_input_power') | int %} 
@@ -140,7 +136,7 @@ action:
                   {% else %}
                     {% set dynamic_value = base_value %}
                   {% endif %}
-                  {% set values = [0, 70, dynamic_value] | sort %}
+                  {% set values = [0, 80, dynamic_value] | sort %}
                   {% set dynamic_value = values[1] %}
                 {% else %}
                   {% set dynamic_value = pv_production - *to grid* - 150 %}
@@ -161,8 +157,7 @@ action:
                 number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
-                {% set base_value =
-                states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
                 {% set *from grid* = states('sensor.*from grid*') | int %} 
                 {% set *to grid* = states('sensor.*to grid*') | int %} 
                 {% if *from grid* > 0 %}
@@ -181,8 +176,7 @@ action:
             - number.*your inverter*limit_nonpersistent_absolute
         data_template:
           value: >
-            {% set base_value =
-            states('number.*your inverter*limit_nonpersistent_absolute') | int %} 
+            {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %} 
             {% set *from grid* = states('sensor.*from grid*') | int %} 
             {% set *to grid* = states('sensor.*to grid*') | int %}
             {% if *from grid* > 0 %}

@@ -41,7 +41,7 @@ action:
               entity_id: number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
-                {{ [0, (states('sensor.solarflow_solar_input_power') | int + 10) - (states('sensor.*to grid*') | int)] | max }}
+               {{ [60, ((states('sensor.solarflow_solar_input_power') | int) + 10)] | max }}
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state

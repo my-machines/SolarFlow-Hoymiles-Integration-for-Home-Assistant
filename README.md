@@ -15,3 +15,6 @@ Please use this code cautiously, recognizing the responsibility to adjust and va
 
 2. **Access Your Hoymiles Inverter:**  
    Ensure access to your Hoymiles inverter via openDTU. For more information, visit [openDTU](https://www.opendtu.solar/).
+
+3. **Read Data from Your Smart Meter via Tasmota:**  
+   To accurately monitor and manage your energy consumption and production, ensure you are reading data from your smart meter using Tasmota. This allows for effective integration and usage within your Home Assistant setup. Learn more about setting up a smart meter interface with Tasmota [here](https://tasmota.github.io/docs/Smart-Meter-Interface/).

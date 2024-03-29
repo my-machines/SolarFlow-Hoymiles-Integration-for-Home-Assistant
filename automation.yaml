@@ -43,7 +43,7 @@ action:
               entity_id: number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
-               {{ [60, ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }} 
+               {{ [70 - (states('sensor.tasmota_home_einspeisung_akt') | int), ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }}
               # this donates the excess energy produced by the panels to the grid if the battery is full
       - conditions:
           - condition: state

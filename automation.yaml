@@ -1,7 +1,9 @@
-# the parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user
-# sensor.solarflow_pack_state = Battery pack status: 0 = standby, 1 = charging, 2 = discharging
-# in the zendure app the discharge limit has to be set on a high value of your choosing (the configuration in the zendure app
-# I use: discharge limit: 800, bypass: auto, minimum reserved battery: 20%, charging limit: 100%, everything else: default)
+# The parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user.
+# sensor.solarflow_pack_state = Battery pack status: 0 = Standby, 1 = Charging, 2 = Discharging.
+# In the Zendure app, the discharge limit has to be set to a high value of your choosing.
+# Example settings in the Zendure app (without liability):
+# Discharge limit: 800, Bypass: Auto, Minimum reserved battery: 20%, Charging limit: 100%, Everything else: Default.
+# Use at your own risk, I assume no liability.
 
 alias: PV Reduced Feed-in Control
 description: Automation for controlling PV/battery feed-in to reduce grid feed-in from the battery but donates excess energy from the panels to the grid
@@ -41,7 +43,8 @@ action:
               entity_id: number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
-               {{ [60, ((states('sensor.solarflow_solar_input_power') | int) + 22)] | max }} # this donates the excess energy produced to the grid
+               {{ [60, ((states('sensor.solarflow_solar_input_power') | int) + 22)] | max }} 
+               # this donates the excess energy produced by the panels to the grid if the battery is full
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state
@@ -74,7 +77,8 @@ action:
                 {% endif %}
 
                 {% set values = [0, base_value, dynamic_value] | sort %} 
-                {{ values[1] }} # allows dynamic adjustment to your needs if production from the panels is > 500 W
+                {{ values[1] }} 
+                # allows dynamic adjustment to your needs if production from the panels is > 500 W
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state
@@ -104,7 +108,8 @@ action:
                 {% else %}
                   {% set dynamic_value = base_value %}
                 {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
-                {{ values[1] }} # allows dynamic adjustment to your needs between 0 and 100 if production from the panels is < 500 W
+                {{ values[1] }} 
+                # allows dynamic adjustment to your needs between 0 and 100 if production from the panels is < 500 W
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state
@@ -140,7 +145,8 @@ action:
                   {% set dynamic_value = values[1] %}
                 {% else %}
                   {% set dynamic_value = pv_production - *to grid* - 150 %}
-                {% endif %} {{ dynamic_value }} # allows dynamic adjustment to your needs when charging the battery above 97% slows down
+                {% endif %} {{ dynamic_value }} 
+                # allows dynamic adjustment to your needs when charging the battery above 97% slows down
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state
@@ -167,7 +173,8 @@ action:
                 {% else %}
                   {% set dynamic_value = base_value %}
                 {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
-                {{ values[1] }} # allows dynamic adjustment to your needs between 0 and 100
+                {{ values[1] }} 
+                # allows dynamic adjustment to your needs between 0 and 100
     default:
       - service: number.set_value
         target:
@@ -186,5 +193,6 @@ action:
             {% else %}
               {% set dynamic_value = base_value %}
             {% endif %} {% set values = [0, 80, dynamic_value] | sort %} 
-            {{ values[1] }} # allows dynamic adjustment to your needs between 0 and 80
+            {{ values[1] }} 
+            # allows dynamic adjustment to your needs between 0 and 80
 mode: restart

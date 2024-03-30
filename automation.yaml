@@ -47,7 +47,7 @@ action:
                 {% set *from grid* = states('sensor.*from grid*') | int %}
                 {% set solarflow_pack_input_power = states('sensor.solarflow_pack_input_power') | int %}
                 {% if solarflow_pack_input_power > 0 %}
-                  {% set values = [0, 60 - *to grid* + *from grid*, 100] | sort %}
+                  {% set values = [0, ((states('sensor.solarflow_solar_input_power') | int) - einspeisung + bezug), 100] | sort %}
                   {{ values[1] }}
                 {% else %}
                   {{ [70 - (states('sensor.*to grid*') | int), ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }}

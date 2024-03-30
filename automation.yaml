@@ -43,8 +43,17 @@ action:
               entity_id: number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
-               {{ [70 - (states('sensor.tasmota_home_einspeisung_akt') | int), ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }}
-              # this donates the excess energy produced by the panels to the grid if the battery is full
+                {% set *to grid* = states('sensor.*to grid*') | int %}
+                {% set *from grid* = states('sensor.*from grid*') | int %}
+                {% set solarflow_pack_input_power = states('sensor.solarflow_pack_input_power') | int %}
+                {% if solarflow_pack_input_power > 0 %}
+                  {% set values = [0, 60 - *to grid* + *from grid*, 100] | sort %}
+                  {{ values[1] }}
+                {% else %}
+                  {{ [70 - (states('sensor.*to grid*') | int), ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }}
+                {% endif %}
+              # this donates the excess energy produced by the panels to the grid if the battery is in standby. In case pack state is not reported
+              # in a timely manner, there is additional logic not to drain the battery by accident.
       - conditions:
           - condition: state
             entity_id: sensor.solarflow_pack_state

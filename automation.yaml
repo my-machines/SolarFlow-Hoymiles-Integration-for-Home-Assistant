@@ -40,7 +40,9 @@ action:
         sequence:
           - service: number.set_value
             target:
-              entity_id: number.*your inverter*limit_nonpersistent_absolute
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
             data:
               value: >-
                 {% set *to grid* = states('sensor.*to grid*') | int %}
@@ -102,9 +104,9 @@ action:
         sequence:
           - service: number.set_value
             target:
-              entity_id: >-
-                number.*your inverter*limit_persistent_absolute,
-                number.*your inverter*limit_nonpersistent_absolute
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
                 {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
@@ -167,9 +169,9 @@ action:
         sequence:
           - service: number.set_value
             target:
-              entity_id: >-
-                number.*your inverter*limit_persistent_absolute,
-                number.*your inverter*limit_nonpersistent_absolute
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
             data_template:
               value: >
                 {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
@@ -184,6 +186,25 @@ action:
                 {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
                 {{ values[1] }} 
               # allows dynamic adjustment to your needs between 0 and 100
+      - conditions:
+          - condition: state
+            entity_id: sensor.*from grid*
+            for:
+              hours: 0
+              minutes: 1
+              seconds: 0
+            state: unavailable
+        sequence:
+          - service: number.set_value
+            target:
+              entity_id:
+                - number.*your inverter*limit_persistent_absolute
+                - number.*your inverter*limit_nonpersistent_absolute
+            data:
+              value: >
+                {% set solar_input_power = states('sensor.solarflow_solar_input_power') | int %} 
+                {% set pack_output_power = states('sensor.solarflow_output_pack_power') | int %} 
+                {{ solar_input_power - pack_output_power if solar_input_power > 0 else 60 }}
     default:
       - service: number.set_value
         target:

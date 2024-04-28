@@ -1,0 +1,9 @@
+# Add this to your 'configuration.yaml', validate config, reload YAML configurations, and add to the dashboard for easy access.
+
+input_number:
+    pv_max_limit:
+      name: PV Maximum Limit
+      min: 0
+      max: 800
+      step: 10
+      unit_of_measurement: 'W'

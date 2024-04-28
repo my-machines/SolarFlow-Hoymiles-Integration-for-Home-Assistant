@@ -18,3 +18,9 @@ Please use this code cautiously, recognizing the responsibility to adjust and va
 
 3. **Read Data from Your Smart Meter via Tasmota:**  
    To accurately monitor and manage your energy consumption and production, ensure you are reading data from your smart meter using Tasmota. This allows for effective integration and usage within your Home Assistant setup. Learn more about setting up a smart meter interface with Tasmota [here](https://tasmota.github.io/docs/Smart-Meter-Interface/).
+
+4. **Add "PV Maximum Limit" to your configuration.yaml**
+
+5. **Add and adopt the Automation**
+
+6. **And then... Profit!**

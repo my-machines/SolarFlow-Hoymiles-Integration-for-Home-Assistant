@@ -1,4 +1,4 @@
-# Please ad "Maximum Limit" to your configuration first. 
+# Please add "Maximum Limit" to your configuration first. 
 # The parameters in the script are placeholders that need to be customized by the user.
 # sensor.solarflow_pack_state = Battery pack status: 0 = Standby, 1 = Charging, 2 = Discharging.
 # In the Zendure app, the discharge limit has to be set to a high value of your choosing.

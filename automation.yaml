@@ -1,4 +1,5 @@
-# The parameters in the script marked with an asterisk (*) are placeholders that need to be customized by the user.
+# Please ad "Maximum Limit" to your configuration first. 
+# The parameters in the script are placeholders that need to be customized by the user.
 # sensor.solarflow_pack_state = Battery pack status: 0 = Standby, 1 = Charging, 2 = Discharging.
 # In the Zendure app, the discharge limit has to be set to a high value of your choosing.
 # Example settings in the Zendure app (without liability):
@@ -8,92 +9,104 @@
 alias: PV Reduced Feed-in Control
 description: Automation for controlling PV/battery feed-in to reduce grid feed-in from the battery but donates excess energy from the panels to the grid
 trigger:
-  - platform: time_pattern
-    seconds: /16
-  - platform: state
+  - platform: time_pattern  # Trigger every 15 seconds
+    seconds: /15
+  - platform: state  # Trigger on change of pack state
     entity_id: sensor.solarflow_pack_state
-  - platform: numeric_state
+  - platform: numeric_state  # Trigger when solar input power is above 500W
     entity_id: sensor.solarflow_solar_input_power
     above: 500
     enabled: false
-  - platform: numeric_state
-    entity_id: sensor.*from grid*
+  - platform: numeric_state  # Placeholder for home energy consumption sensor
+    entity_id: sensor.energy_consumption_home
     above: 1
     enabled: false
-  - platform: numeric_state
-    entity_id: sensor.*to grid*
+  - platform: numeric_state  # Placeholder for home energy feed-in sensor
+    entity_id: sensor.energy_feed_in_home
     above: 1
     enabled: false
 condition: []
 action:
   - choose:
-      - conditions:
+      - conditions:  # If home consumption sensor is unavailable for 1 minute
           - condition: state
-            entity_id: sensor.solarflow_pack_state
-            state: "0" # battery in standby
+            entity_id: sensor.energy_consumption_home
             for:
               hours: 0
-              minutes: 0
-              seconds: 30
-          - condition: and
-            conditions: []
+              minutes: 1
+              seconds: 0
+            state: unavailable
         sequence:
-          - service: number.set_value
+          - service: number.set_value  # Set PV limits to 80
             target:
               entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
+                - number.pv_limit_persistent
+                - number.pv_limit_temporary
+            data:
+              value: "80"
+      - conditions:  # If pack state is 0 for 30 seconds or electric level is above 99%
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: sensor.solarflow_pack_state
+                state: "0"
+                for:
+                  hours: 0
+                  minutes: 0
+                  seconds: 30
+              - condition: numeric_state
+                entity_id: sensor.solarflow_electric_level
+                above: 99
+        sequence:
+          - service: number.set_value  # Adjust PV limits based on feed-in and other conditions
+            target:
+              entity_id:
+                - number.pv_limit_persistent
+                - number.pv_limit_temporary
             data:
               value: >-
-                {% set *to grid* = states('sensor.*to grid*') | int %}
-                {% set *from grid* = states('sensor.*from grid*') | int %}
-                {% set solarflow_pack_input_power = states('sensor.solarflow_pack_input_power') | int %}
-                {% if solarflow_pack_input_power > 0 %}
-                  {% set values = [0, ((states('sensor.solarflow_solar_input_power') | int) - einspeisung + bezug), 100] | sort %}
-                  {{ values[1] }}
-                {% else %}
-                  {{ [70 - (states('sensor.*to grid*') | int), ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max }}
-                {% endif %}
-              # this donates the excess energy produced by the panels to the grid if the battery is in standby. In case pack state is not reported
-              # in a timely manner, there is additional logic not to drain the battery by accident.
-      - conditions:
+                {% set feed_in = states('sensor.energy_feed_in_home') | int %}
+                {% set consumption = states('sensor.energy_consumption_home') | int %}
+                {% set max_value = states('input_number.pv_max_limit') | int %}
+                {{ [90 - feed_in, ((states('sensor.solarflow_solar_input_power') | int) + 24)] | max(max_value) }}
+      - conditions:  # Additional conditions for state 1 of pack state, solar input power above 450W
           - condition: state
             entity_id: sensor.solarflow_pack_state
-            state: "1" # battery is charging
+            state: "1"
             for:
               hours: 0
               minutes: 0
               seconds: 30
           - condition: numeric_state
             entity_id: sensor.solarflow_solar_input_power
-            above: 500
+            above: 450
         sequence:
-          - service: number.set_value
+          - service: number.set_value  # Template to calculate and adjust PV limit based on dynamic conditions
             target:
               entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
+                - number.pv_limit_persistent
+                - number.pv_limit_temporary
             data_template:
               value: >
-                {% set solar_input = states('sensor.solarflow_solar_input_power') | int %} 
-                {% set base_value = 100 + max(solar_input - 500, 0) %} 
-                {% set *from grid* = states('sensor.*from grid*') | int %} 
-                {% set *to grid* = states('sensor.*to grid*') | int %} 
-                {% set dynamic_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
+                {% set solar_input = states('sensor.solarflow_solar_input_power') | int %}
+                {% set base_value = 300 + max(solar_input - 450, 0) %}
+                {% set consumption = states('sensor.energy_consumption_home') | int %}
+                {% set feed_in = states('sensor.energy_feed_in_home') | int %}
+                {% set dynamic_value = states('number.pv_limit_temporary') | int %}
+                {% set max_value = states('input_number.pv_max_limit') | int %}
 
-                {% if *from grid* > 0 %}
-                  {% set dynamic_value = dynamic_value + *from grid* %}
-                {% elif *to grid* > 0 %}
-                  {% set dynamic_value = dynamic_value - *to grid* %}
+                {% if consumption > 0 %}
+                  {% set dynamic_value = dynamic_value + consumption %}
+                {% elif feed_in > 0 %}
+                  {% set dynamic_value = dynamic_value - feed_in %}
                 {% endif %}
 
-                {% set values = [0, base_value, dynamic_value] | sort %} 
-                {{ values[1] }} 
-              # allows dynamic adjustment to your needs if production from the panels is > 500 W
-      - conditions:
+                {% set values = [0, base_value, dynamic_value] | sort %}
+                {{ values[1] }}
+      - conditions:  # More conditions and template logic for different scenarios
           - condition: state
             entity_id: sensor.solarflow_pack_state
-            state: "1" # battery is charging
+            state: "1"
             for:
               hours: 0
               minutes: 0
@@ -105,124 +118,42 @@ action:
           - service: number.set_value
             target:
               entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
+                - number.pv_limit_persistent
+                - number.pv_limit_temporary
             data_template:
               value: >
-                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
-                {% set *from grid* = states('sensor.*from grid*') | int %} 
-                {% set *to grid* = states('sensor.*to grid*') | int %} 
-                {% if *from grid* > 0 %}
-                  {% set dynamic_value = base_value + *from grid* %}
-                {% elif *to grid* > 0 %}
-                  {% set dynamic_value = base_value - *to grid* %}
+                {% set base_value = states('number.pv_limit_temporary') | int %}
+                {% set consumption = states('sensor.energy_consumption_home') | int %}
+                {% set feed_in = states('sensor.energy_feed_in_home') | int %}
+                {% set max_value = states('input_number.pv_max_limit') | int %}
+                {% if consumption > 0 %}
+                  {% set dynamic_value = base_value + consumption %}
+                {% elif feed_in > 0 %}
+                  {% set dynamic_value = base_value - feed_in %}
                 {% else %}
                   {% set dynamic_value = base_value %}
-                {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
-                {{ values[1] }} 
-              # allows dynamic adjustment to your needs between 0 and 100 if production from the panels is < 500 W
-      - conditions:
-          - condition: state
-            entity_id: sensor.solarflow_pack_state
-            state: "1" # battery is charging
-            for:
-              hours: 0
-              minutes: 0
-              seconds: 30
-          - condition: numeric_state
-            entity_id: sensor.solarflow_electric_level
-            above: 96
-        sequence:
-          - service: number.set_value
-            target:
-              entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
-            data_template:
-              value: >
-                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
-                {% set *from grid* = states('sensor.*from grid*') | int %} 
-                {% set *to grid* = states('sensor.*to grid*') | int %} 
-                {% set pv_production = states('sensor.solarflow_solar_input_power') | int %} 
-                {% if pv_production <= 200 %}
-                  {% if *from grid* > 0 %}
-                    {% set dynamic_value = base_value + *from grid* %}
-                  {% elif *to grid* > 0 %}
-                    {% set dynamic_value = base_value - *to grid* %}
-                  {% else %}
-                    {% set dynamic_value = base_value %}
-                  {% endif %}
-                  {% set values = [0, 80, dynamic_value] | sort %}
-                  {% set dynamic_value = values[1] %}
-                {% else %}
-                  {% set dynamic_value = pv_production - *to grid* - 150 %}
-                {% endif %} {{ dynamic_value }} 
-              # allows dynamic adjustment to your needs when charging the battery above 97% slows down
-      - conditions:
-          - condition: state
-            entity_id: sensor.solarflow_pack_state
-            state: "2" # battery is discharging
-            for:
-              hours: 0
-              minutes: 0
-              seconds: 30
-        sequence:
-          - service: number.set_value
-            target:
-              entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
-            data_template:
-              value: >
-                {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %}
-                {% set *from grid* = states('sensor.*from grid*') | int %} 
-                {% set *to grid* = states('sensor.*to grid*') | int %} 
-                {% if *from grid* > 0 %}
-                  {% set dynamic_value = base_value + *from grid* %}
-                {% elif *to grid* > 0 %}
-                  {% set dynamic_value = base_value - *to grid* %}
-                {% else %}
-                  {% set dynamic_value = base_value %}
-                {% endif %} {% set values = [0, 100, dynamic_value] | sort %} 
-                {{ values[1] }} 
-              # allows dynamic adjustment to your needs between 0 and 100
-      - conditions:
-          - condition: state
-            entity_id: sensor.*from grid*
-            for:
-              hours: 0
-              minutes: 1
-              seconds: 0
-            state: unavailable
-        sequence:
-          - service: number.set_value
-            target:
-              entity_id:
-                - number.*your inverter*limit_persistent_absolute
-                - number.*your inverter*limit_nonpersistent_absolute
-            data:
-              value: >
-                {% set solar_input_power = states('sensor.solarflow_solar_input_power') | int %} 
-                {% set pack_output_power = states('sensor.solarflow_output_pack_power') | int %} 
-                {{ solar_input_power - pack_output_power if solar_input_power > 0 else 60 }}
+                {% endif %}
+                {% set values = [0, max_value, dynamic_value] | sort %}
+                {{ values[1] }}
     default:
-      - service: number.set_value
+      - service: number.set_value  # Default action to reset PV limits
         target:
           entity_id:
-            - number.*your inverter*limit_persistent_absolute
-            - number.*your inverter*limit_nonpersistent_absolute
+            - number.pv_limit_persistent
+            - number.pv_limit_temporary
         data_template:
           value: >
-            {% set base_value = states('number.*your inverter*limit_nonpersistent_absolute') | int %} 
-            {% set *from grid* = states('sensor.*from grid*') | int %} 
-            {% set *to grid* = states('sensor.*to grid*') | int %}
-            {% if *from grid* > 0 %}
-              {% set dynamic_value = base_value + *from grid* %}
-            {% elif *to grid* > 0 %}
-              {% set dynamic_value = base_value - *to grid* %}
+            {% set base_value = states('number.pv_limit_temporary') | int %}
+            {% set consumption = states('sensor.energy_consumption_home') | int %}
+            {% set feed_in = states('sensor.energy_feed_in_home') | int %}
+            {% set max_value = states('input_number.pv_max_limit') | int %}
+            {% if consumption > 0 %}
+              {% set dynamic_value = base_value + consumption %}
+            {% elif feed_in > 0 %}
+              {% set dynamic_value = base_value - feed_in %}
             {% else %}
               {% set dynamic_value = base_value %}
-            {% endif %} {% set values = [0, 80, dynamic_value] | sort %} 
-            {{ values[1] }} 
-          # allows dynamic adjustment to your needs between 0 and 80 if no state is available
+            {% endif %}
+            {% set values = [0, max_value, dynamic_value] | sort %}
+            {{ values[1] }}
 mode: restart
